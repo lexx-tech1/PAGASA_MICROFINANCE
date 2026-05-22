@@ -1,0 +1,10 @@
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="secure_session.xml" />
+        <exclude domain="database" path="pagasa_offline.db" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="secure_session.xml" />
+        <exclude domain="database" path="pagasa_offline.db" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function branchClaim() { return request.auth.token.branchId; }
+    function role() { return request.auth.token.role; }
+    function sameBranch(branchId) { return signedIn() && branchClaim() == branchId; }
+    function staffForBranch(branchId) { return sameBranch(branchId) && (role() in ['BRANCH_STAFF', 'ADMIN']); }
+    function memberSelf(uid, branchId) { return sameBranch(branchId) && request.auth.uid == uid; }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).changedKeys().hasAny(['branchId', 'role']);
+      allow create, delete: if false;
+    }
+
+    match /branches/{branchId} {
+      allow read: if sameBranch(branchId);
+      allow write: if staffForBranch(branchId) && role() == 'ADMIN';
+
+      match /members/{uid} {
+        allow read: if memberSelf(uid, branchId) || staffForBranch(branchId);
+        allow update: if memberSelf(uid, branchId)
+          && !request.resource.data.diff(resource.data).changedKeys().hasAny(['balance', 'role']);
+        allow write: if staffForBranch(branchId);
+
+        match /loans/{loanId} {
+          allow read: if memberSelf(uid, branchId) || staffForBranch(branchId);
+          allow create, update, delete: if staffForBranch(branchId);
+        }
+
+        match /savings/{accountId} {
+          allow read: if memberSelf(uid, branchId) || staffForBranch(branchId);
+          allow create, update, delete: if staffForBranch(branchId);
+        }
+
+        match /transactions/{transactionId} {
+          allow read: if memberSelf(uid, branchId) || staffForBranch(branchId);
+          allow write: if staffForBranch(branchId);
+        }
+
+        match /notifications/{notificationId} {
+          allow read: if memberSelf(uid, branchId) || staffForBranch(branchId);
+          allow update: if memberSelf(uid, branchId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read']);
+          allow create, delete: if staffForBranch(branchId);
+        }
+
+        match /devices/{deviceId} {
+          allow read, create, update, delete: if memberSelf(uid, branchId);
+        }
+      }
+
+      match /loanTypes/{loanTypeId} {
+        allow read: if sameBranch(branchId);
+        allow write: if staffForBranch(branchId);
+      }
+
+      match /loanApplications/{applicationId} {
+        allow create: if sameBranch(branchId) && request.resource.data.uid == request.auth.uid;
+        allow read: if (sameBranch(branchId) && resource.data.uid == request.auth.uid) || staffForBranch(branchId);
+        allow update, delete: if staffForBranch(branchId);
+      }
+
+      match /supportTickets/{ticketId} {
+        allow create: if sameBranch(branchId) && request.resource.data.uid == request.auth.uid;
+        allow read: if (sameBranch(branchId) && resource.data.uid == request.auth.uid) || staffForBranch(branchId);
+        allow update: if staffForBranch(branchId);
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function sameBranch(branchId) { return signedIn() && request.auth.token.branchId == branchId; }
+    function staffForBranch(branchId) { return sameBranch(branchId) && request.auth.token.role in ['BRANCH_STAFF', 'ADMIN']; }
+
+    match /branches/{branchId}/members/{uid}/documents/{fileName} {
+      allow read: if (sameBranch(branchId) && request.auth.uid == uid) || staffForBranch(branchId);
+      allow write: if sameBranch(branchId) && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/.*');
+    }
+
+    match /branches/{branchId}/members/{uid}/receipts/{fileName} {
+      allow read: if (sameBranch(branchId) && request.auth.uid == uid) || staffForBranch(branchId);
+      allow write: if staffForBranch(branchId);
+    }
+  }
+}

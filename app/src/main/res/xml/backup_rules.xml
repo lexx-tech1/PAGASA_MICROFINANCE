@@ -1,0 +1,4 @@
+<full-backup-content>
+    <exclude domain="sharedpref" path="secure_session.xml" />
+    <exclude domain="database" path="pagasa_offline.db" />
+</full-backup-content>
